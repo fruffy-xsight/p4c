@@ -558,6 +558,24 @@ void TableStepper::addDefaultAction(std::optional<const IR::Expression *> tableM
     stepper->result->emplace_back(tableMissCondition, stepper->state, nextState, coveredNodes);
 }
 
+bool TableStepper::controlPlaneCanSelect(const IR::ActionListElement *actionElement) {
+    return !actionElement->hasAnnotation(IR::Annotation::defaultOnlyAnnotation);
+}
+
+std::vector<const IR::ActionListElement *> TableStepper::buildTableActionList() {
+    std::vector<const IR::ActionListElement *> tableActionList;
+    const auto *actionList = table->getActionList();
+    if (actionList == nullptr) {
+        return tableActionList;
+    }
+    for (const auto *actionElement : actionList->actionList) {
+        if (controlPlaneCanSelect(actionElement)) {
+            tableActionList.emplace_back(actionElement);
+        }
+    }
+    return tableActionList;
+}
+
 void TableStepper::checkTargetProperties(
     const std::vector<const IR::ActionListElement *> & /*tableActionList*/) {}
 
@@ -585,7 +603,7 @@ bool TableStepper::eval() {
         return false;
     }
     // Gather the list of executable actions. This does not include default actions, for example.
-    const auto tableActionList = TableUtils::buildTableActionList(*table);
+    const auto tableActionList = buildTableActionList();
 
     checkTargetProperties(tableActionList);
 
