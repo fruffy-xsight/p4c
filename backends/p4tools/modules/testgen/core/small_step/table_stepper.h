@@ -77,8 +77,14 @@ class TableStepper {
     /// tableMissCondition is true.
     void addDefaultAction(std::optional<const IR::Expression *> tableMissCondition);
 
-    /// Helper function that collects the list of actions contained in the table.
+    /// Helper function that collects the actions of the table the control plane can select.
     std::vector<const IR::ActionListElement *> buildTableActionList();
+
+    /// @returns true when the control plane can select @p actionElement.
+    /// The P4 specification reserves an action that the action list annotates `@defaultonly`
+    /// for the default action, so the control plane receives no value that selects it. A
+    /// target whose control plane reads the annotation elsewhere overrides this method.
+    [[nodiscard]] virtual bool controlPlaneCanSelect(const IR::ActionListElement *actionElement);
 
     /// Sets the action taken by the given table. The arguments in the given MethodCallExpression
     /// are assumed to be symbolic values.
