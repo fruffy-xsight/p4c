@@ -570,7 +570,7 @@ bool Z3Translator::preorder(const IR::Div *op) { return recurseBinary(op, z3::op
 
 bool Z3Translator::preorder(const IR::Shl *op) {
     op = rewriteShift(op);
-    return recurseBinary(op, z3::shl);
+    return recurseShift(op, z3::shl);
 }
 
 bool Z3Translator::preorder(const IR::Shr *op) {
@@ -581,9 +581,9 @@ bool Z3Translator::preorder(const IR::Shr *op) {
     BUG_CHECK(leftType, "Shift operand is not a bits<n>: %1%", op->left);
 
     if (leftType->isSigned) {
-        return recurseBinary(op, z3::ashr);
+        return recurseShift(op, z3::ashr);
     }
-    return recurseBinary(op, z3::lshr);
+    return recurseShift(op, z3::lshr);
 }
 
 bool Z3Translator::preorder(const IR::BAnd *op) { return recurseBinary(op, z3::operator&); }
@@ -604,6 +604,33 @@ bool Z3Translator::recurseBinary(const IR::Operation_Binary *binary, Z3BinaryOp 
     auto left = translateChild(binary->left);
     auto right = translateChild(binary->right);
     result = f(left, right);
+    return false;
+}
+
+bool Z3Translator::recurseShift(const IR::Operation_Binary *shift, Z3BinaryOp f) {
+    BUG_CHECK(shift, "Z3Translator: encountered null node during translation");
+    auto left = translateChild(shift->left);
+    auto right = translateChild(shift->right);
+    BUG_CHECK(left.is_bv() && right.is_bv(), "Shift operands are not bit vectors: %1%", shift);
+    auto leftWidth = left.get_sort().bv_size();
+    auto rightWidth = right.get_sort().bv_size();
+    // Z3 needs both operands of a shift to have the same width. Padding a narrower shift amount
+    // with zeros does not change its value.
+    if (rightWidth <= leftWidth) {
+        if (rightWidth < leftWidth) {
+            right = z3::zext(right, leftWidth - rightWidth);
+        }
+        result = f(left, right);
+        return false;
+    }
+    // A wider shift amount cannot simply be cut down, because that could change its value.
+    // Instead, widen the value to the width of the shift amount, shift, and keep the low bits.
+    // Signed values are sign-extended so that an arithmetic shift fills in the same bits.
+    const auto *leftType = shift->left->type->to<IR::Type::Bits>();
+    BUG_CHECK(leftType, "Shift operand is not a bits<n>: %1%", shift->left);
+    left = leftType->isSigned ? z3::sext(left, rightWidth - leftWidth)
+                              : z3::zext(left, rightWidth - leftWidth);
+    result = f(left, right).extract(leftWidth - 1, 0);
     return false;
 }
 
