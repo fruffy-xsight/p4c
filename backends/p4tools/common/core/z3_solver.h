@@ -246,8 +246,9 @@ class Z3Translator : public virtual Inspector {
     /// @returns false.
     bool recurseBinary(const IR::Operation_Binary *binary, Z3BinaryOp f);
 
-    /// Translates a shift. In P4 the shift amount can have a different width than the value,
-    /// but Z3 needs both operands to have the same width.
+    /// Handles shifts, whose operands can have different widths in P4.
+    ///
+    /// @returns false.
     bool recurseShift(const IR::Operation_Binary *shift, Z3BinaryOp f);
 
     /// Handles recursion into ternary operations.
